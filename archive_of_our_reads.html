@@ -1,0 +1,2423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Archive of Our Reads | Un Archivo Propio para EPUB y PDF</title>
+  <meta name="description" content="Lector online y biblioteca personal inspirada en Archive of Our Own (AO3) para leer EPUBs, PDFs y fics.">
+
+  <!-- PDF.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- JSZip & ePub.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/epub.js/0.3.93/epub.min.js"></script>
+
+  <style>
+    /* ==========================================================================
+       AO3 BASE THEME & RESET
+       ========================================================================== */
+    :root {
+      --ao3-red: #990000;
+      --ao3-dark-red: #770000;
+      --ao3-border-red: #aa0000;
+      --ao3-link: #990000;
+      --ao3-link-hover: #111111;
+      --ao3-bg: #ffffff;
+      --ao3-surface: #f7f7f7;
+      --ao3-surface-hover: #ececec;
+      --ao3-card-border: #cccccc;
+      --ao3-text: #2a2a2a;
+      --ao3-text-muted: #555555;
+      --ao3-tag-bg: #e6e6e6;
+      --ao3-tag-hover: #d2d2d2;
+      --ao3-font-serif: "Georgia", "Cambria", "Times New Roman", serif;
+      --ao3-font-sans: -apple-system, BlinkMacSystemFont, "Lucida Grande", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --ao3-header-text: #ffffff;
+      --badge-border: #666666;
+    }
+
+    /* REVERSI SKIN (Dark Mode) */
+    body.skin-reversi {
+      --ao3-red: #b33939;
+      --ao3-dark-red: #331111;
+      --ao3-border-red: #b33939;
+      --ao3-link: #e28d8d;
+      --ao3-link-hover: #ffffff;
+      --ao3-bg: #1e1e1e;
+      --ao3-surface: #2b2b2b;
+      --ao3-surface-hover: #363636;
+      --ao3-card-border: #444444;
+      --ao3-text: #e0e0e0;
+      --ao3-text-muted: #aaaaaa;
+      --ao3-tag-bg: #3c3c3c;
+      --ao3-tag-hover: #4e4e4e;
+      --badge-border: #888888;
+    }
+
+    /* SEPIA CALM SKIN */
+    body.skin-sepia {
+      --ao3-red: #8b3a1a;
+      --ao3-dark-red: #682910;
+      --ao3-border-red: #a44825;
+      --ao3-link: #8b3a1a;
+      --ao3-link-hover: #2e1a10;
+      --ao3-bg: #f6ecdc;
+      --ao3-surface: #ede0cb;
+      --ao3-surface-hover: #e2d3bb;
+      --ao3-card-border: #d4be9e;
+      --ao3-text: #41352a;
+      --ao3-text-muted: #6f5f4f;
+      --ao3-tag-bg: #ded0ba;
+      --ao3-tag-hover: #d2c0a4;
+      --badge-border: #7f6e59;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--ao3-bg);
+      color: var(--ao3-text);
+      font-family: var(--ao3-font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      transition: background-color 0.2s ease, color 0.2s ease;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    a {
+      color: var(--ao3-link);
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    a:hover {
+      color: var(--ao3-link-hover);
+      text-decoration: none;
+    }
+
+    /* ==========================================================================
+       HEADER & NAVIGATION (Classic AO3 Burgundy)
+       ========================================================================== */
+    header#ao3-header {
+      background: linear-gradient(to bottom, #990000 0%, #7a0000 100%);
+      border-bottom: 2px solid #5a0000;
+      color: #ffffff;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    body.skin-reversi header#ao3-header {
+      background: linear-gradient(to bottom, #440000 0%, #290000 100%);
+      border-bottom: 2px solid #110000;
+    }
+
+    body.skin-sepia header#ao3-header {
+      background: linear-gradient(to bottom, #873617 0%, #682910 100%);
+      border-bottom: 2px solid #4a1c09;
+    }
+
+    .header-top {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      text-decoration: none;
+      color: #ffffff;
+    }
+
+    .brand h1 {
+      font-family: var(--ao3-font-serif);
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin: 0;
+      color: #ffffff;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    }
+
+    .brand .sub-brand {
+      font-size: 13px;
+      opacity: 0.9;
+      font-style: italic;
+      font-family: var(--ao3-font-serif);
+    }
+
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .nav-btn {
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      color: #ffffff !important;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 4px;
+      text-decoration: none !important;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .nav-btn:hover {
+      background: rgba(255, 255, 255, 0.28);
+      transform: translateY(-1px);
+    }
+
+    .nav-btn.active {
+      background: #ffffff;
+      color: #990000 !important;
+      border-color: #ffffff;
+    }
+
+    body.skin-reversi .nav-btn.active {
+      color: #2b2b2b !important;
+    }
+
+    body.skin-sepia .nav-btn.active {
+      color: #682910 !important;
+    }
+
+    /* Sub-nav banner */
+    .header-subnav {
+      background: rgba(0, 0, 0, 0.18);
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px 16px;
+    }
+
+    .header-subnav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .header-search {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .header-search input {
+      background: #ffffff;
+      border: 1px solid #999;
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 3px;
+      width: 220px;
+      outline: none;
+      color: #222;
+    }
+
+    .header-search input:focus {
+      border-color: #333;
+      box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    }
+
+    .btn-search {
+      background: #f0f0f0;
+      border: 1px solid #aaa;
+      color: #333;
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .btn-search:hover {
+      background: #e0e0e0;
+    }
+
+    /* ==========================================================================
+       MAIN CONTAINER & LAYOUT
+       ========================================================================== */
+    main#main-content {
+      max-width: 1200px;
+      margin: 16px auto;
+      padding: 0 16px;
+      width: 100%;
+      flex: 1;
+    }
+
+    .dashboard-header {
+      border-bottom: 2px solid var(--ao3-red);
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .dashboard-header h2 {
+      font-family: var(--ao3-font-serif);
+      font-size: 22px;
+      color: var(--ao3-text);
+      font-weight: 600;
+    }
+
+    .results-count {
+      font-size: 13px;
+      color: var(--ao3-text-muted);
+    }
+
+    /* Filters Bar */
+    .filter-bar {
+      background: var(--ao3-surface);
+      border: 1px solid var(--ao3-card-border);
+      border-radius: 4px;
+      padding: 10px 14px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .filter-bar label {
+      font-weight: 600;
+      margin-right: 4px;
+    }
+
+    .filter-bar select {
+      background: var(--ao3-bg);
+      color: var(--ao3-text);
+      border: 1px solid var(--ao3-card-border);
+      padding: 4px 8px;
+      border-radius: 3px;
+      font-size: 12px;
+      outline: none;
+    }
+
+    /* ==========================================================================
+       AO3 WORK BLURB / CARD COMPONENT
+       ========================================================================== */
+    .work-blurb {
+      background: var(--ao3-surface);
+      border: 1px solid var(--ao3-card-border);
+      border-radius: 4px;
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      position: relative;
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 16px;
+      transition: box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+
+    .work-blurb:hover {
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      border-color: #aaa;
+    }
+
+    @media (max-width: 600px) {
+      .work-blurb {
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+    }
+
+    /* Iconic AO3 4-Square Icon */
+    .required-tags {
+      width: 72px;
+      height: 72px;
+      display: grid;
+      grid-template-columns: 36px 36px;
+      grid-template-rows: 36px 36px;
+      border: 1px solid var(--badge-border);
+      background: #ffffff;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+      flex-shrink: 0;
+    }
+
+    .rating-quadrant {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 900;
+      color: #ffffff;
+      border: 1px solid rgba(0,0,0,0.15);
+      position: relative;
+      user-select: none;
+      cursor: help;
+    }
+
+    /* Quadrant Ratings */
+    .quad-general   { background-color: #2ecc71; color: #fff; }
+    .quad-teen      { background-color: #f1c40f; color: #333; }
+    .quad-mature    { background-color: #e67e22; color: #fff; }
+    .quad-explicit  { background-color: #c0392b; color: #fff; }
+    .quad-notrated  { background-color: #ffffff; color: #777; border-color: #ccc; }
+
+    /* Quadrant Categories */
+    .quad-fm    { background-color: #9b59b6; color: #fff; }
+    .quad-mm    { background-color: #3498db; color: #fff; }
+    .quad-ff    { background-color: #e84393; color: #fff; }
+    .quad-multi { background-color: #1abc9c; color: #fff; }
+    .quad-gen   { background-color: #27ae60; color: #fff; }
+    .quad-cat-none { background-color: #ffffff; color: #aaa; }
+
+    /* Quadrant Warnings */
+    .quad-warn-yes { background-color: #d63031; color: #fff; }
+    .quad-warn-no  { background-color: #ffffff; color: #999; }
+
+    /* Quadrant Complete */
+    .quad-complete   { background-color: #34495e; color: #fff; }
+    .quad-inprogress { background-color: #ffffff; color: #e74c3c; }
+
+    /* Work Header Information */
+    .blurb-main {
+      min-width: 0;
+    }
+
+    .blurb-header {
+      margin-bottom: 6px;
+    }
+
+    .work-title {
+      font-family: var(--ao3-font-serif);
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--ao3-red);
+      text-decoration: underline;
+    }
+
+    .work-title:hover {
+      text-decoration: none;
+    }
+
+    .work-author {
+      font-size: 14px;
+      font-weight: normal;
+      color: var(--ao3-text);
+      margin-left: 6px;
+    }
+
+    .fandom-tags {
+      font-size: 12px;
+      margin-top: 2px;
+      font-weight: 600;
+      color: var(--ao3-text-muted);
+    }
+
+    .fandom-tags a {
+      color: var(--ao3-red);
+      text-decoration: none;
+    }
+
+    .fandom-tags a:hover {
+      text-decoration: underline;
+    }
+
+    /* Tag Clusters */
+    .tags-container {
+      margin: 8px 0;
+      line-height: 1.8;
+      font-size: 12px;
+    }
+
+    .tag-pill {
+      display: inline-block;
+      padding: 1px 7px;
+      margin: 2px 4px 2px 0;
+      border-radius: 3px;
+      background: var(--ao3-tag-bg);
+      color: var(--ao3-text);
+      text-decoration: none;
+      font-size: 11.5px;
+      transition: background 0.1s ease;
+      cursor: pointer;
+    }
+
+    .tag-pill:hover {
+      background: var(--ao3-tag-hover);
+      color: var(--ao3-text);
+      text-decoration: none;
+    }
+
+    .tag-pill.warning-tag {
+      font-weight: bold;
+      color: var(--ao3-red);
+    }
+
+    .tag-pill.relationship-tag {
+      font-weight: 600;
+      background: rgba(153, 0, 0, 0.08);
+      color: var(--ao3-red);
+      border: 1px solid rgba(153, 0, 0, 0.2);
+    }
+
+    body.skin-reversi .tag-pill.relationship-tag {
+      background: rgba(226, 141, 141, 0.15);
+      color: #e28d8d;
+      border-color: rgba(226, 141, 141, 0.3);
+    }
+
+    .tag-pill.character-tag {
+      font-style: italic;
+    }
+
+    /* Summary blockquote with AO3 signature red border */
+    .blurb-summary {
+      background: var(--ao3-bg);
+      border-left: 3px solid var(--ao3-red);
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 13px;
+      font-family: var(--ao3-font-serif);
+      line-height: 1.45;
+      color: var(--ao3-text);
+      border-radius: 0 4px 4px 0;
+      word-break: break-word;
+    }
+
+    /* Blurb Stats bar */
+    .blurb-stats {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 12px;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px dashed var(--ao3-card-border);
+      color: var(--ao3-text-muted);
+    }
+
+    .blurb-stats span strong {
+      color: var(--ao3-text);
+    }
+
+    /* Work action toolbar */
+    .blurb-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .action-btn {
+      background: var(--ao3-red);
+      color: #ffffff;
+      border: none;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 3px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      text-decoration: none;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .action-btn:hover {
+      background: var(--ao3-dark-red);
+      color: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    .action-btn.btn-secondary {
+      background: var(--ao3-surface);
+      color: var(--ao3-text);
+      border: 1px solid var(--ao3-card-border);
+    }
+
+    .action-btn.btn-secondary:hover {
+      background: var(--ao3-surface-hover);
+    }
+
+    .action-btn.btn-danger {
+      background: transparent;
+      color: #a00;
+      border: 1px solid #dca;
+    }
+
+    .action-btn.btn-danger:hover {
+      background: #ffebeb;
+      color: #700;
+    }
+
+    /* ==========================================================================
+       MODAL / UPLOAD WORK DIALOG
+       ========================================================================== */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(2px);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-card {
+      background: var(--ao3-bg);
+      color: var(--ao3-text);
+      border: 2px solid var(--ao3-red);
+      border-radius: 6px;
+      max-width: 720px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      padding: 24px;
+      position: relative;
+    }
+
+    .modal-title {
+      font-family: var(--ao3-font-serif);
+      font-size: 20px;
+      color: var(--ao3-red);
+      border-bottom: 1px solid var(--ao3-card-border);
+      padding-bottom: 8px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .close-modal-btn {
+      background: transparent;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--ao3-text-muted);
+      line-height: 1;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .form-group .form-help {
+      font-size: 11.5px;
+      color: var(--ao3-text-muted);
+      margin-top: 2px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--ao3-card-border);
+      background: var(--ao3-surface);
+      color: var(--ao3-text);
+      border-radius: 3px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .form-control:focus {
+      border-color: var(--ao3-red);
+      background: var(--ao3-bg);
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 600px) {
+      .form-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .file-dropzone {
+      border: 2px dashed var(--ao3-red);
+      background: rgba(153, 0, 0, 0.03);
+      padding: 24px;
+      text-align: center;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 16px;
+      transition: background 0.15s ease;
+    }
+
+    .file-dropzone:hover, .file-dropzone.dragover {
+      background: rgba(153, 0, 0, 0.08);
+    }
+
+    .file-dropzone p {
+      margin: 4px 0;
+      font-size: 13px;
+    }
+
+    .file-dropzone .dropzone-icon {
+      font-size: 32px;
+      color: var(--ao3-red);
+      margin-bottom: 6px;
+    }
+
+    /* ==========================================================================
+       READER VIEW (FULL SCREEN / IMMERSIVE READING)
+       ========================================================================== */
+    #reader-view {
+      display: none;
+      flex-direction: column;
+      min-height: 100vh;
+      background: var(--ao3-bg);
+    }
+
+    #reader-view.active {
+      display: flex;
+    }
+
+    .reader-toolbar {
+      background: var(--ao3-surface);
+      border-bottom: 1px solid var(--ao3-card-border);
+      padding: 8px 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .reader-toolbar-left, .reader-toolbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .reader-title-badge {
+      font-family: var(--ao3-font-serif);
+      font-weight: bold;
+      color: var(--ao3-red);
+      font-size: 15px;
+      max-width: 280px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .reader-btn {
+      background: var(--ao3-bg);
+      border: 1px solid var(--ao3-card-border);
+      color: var(--ao3-text);
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 3px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .reader-btn:hover {
+      background: var(--ao3-surface-hover);
+      border-color: #999;
+    }
+
+    .reader-btn.active {
+      background: var(--ao3-red);
+      color: #fff;
+      border-color: var(--ao3-red);
+    }
+
+    .reader-container {
+      max-width: 860px;
+      width: 100%;
+      margin: 20px auto;
+      padding: 0 20px 40px;
+      flex: 1;
+    }
+
+    .reader-container.reader-wide {
+      max-width: 1100px;
+    }
+
+    /* AO3 Fanfic Header inside reader */
+    .reader-fic-preface {
+      background: var(--ao3-surface);
+      border: 1px solid var(--ao3-card-border);
+      border-radius: 4px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+
+    .reader-fic-preface h2 {
+      font-family: var(--ao3-font-serif);
+      font-size: 26px;
+      color: var(--ao3-red);
+      margin-bottom: 4px;
+      text-align: center;
+    }
+
+    .reader-fic-preface .preface-byline {
+      text-align: center;
+      font-size: 14px;
+      margin-bottom: 16px;
+      color: var(--ao3-text-muted);
+    }
+
+    .reader-fic-preface .preface-meta {
+      border-top: 1px dashed var(--ao3-card-border);
+      border-bottom: 1px dashed var(--ao3-card-border);
+      padding: 12px 0;
+      margin: 12px 0;
+      font-size: 12.5px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .reader-fic-preface .preface-summary {
+      background: var(--ao3-bg);
+      border-left: 3px solid var(--ao3-red);
+      padding: 10px 14px;
+      font-style: italic;
+      margin-top: 10px;
+      font-family: var(--ao3-font-serif);
+    }
+
+    /* Content Area */
+    #text-content-area {
+      font-family: var(--ao3-font-serif);
+      font-size: 16px;
+      line-height: 1.7;
+      color: var(--ao3-text);
+      word-wrap: break-word;
+    }
+
+    #text-content-area p {
+      margin-bottom: 1.2em;
+      text-indent: 1.5em;
+    }
+
+    #text-content-area p:first-of-type,
+    #text-content-area h1 + p,
+    #text-content-area h2 + p,
+    #text-content-area h3 + p {
+      text-indent: 0;
+    }
+
+    /* PDF Viewer Canvas */
+    #pdf-viewer-wrapper {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+    }
+
+    #pdf-canvas {
+      max-width: 100%;
+      height: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      border: 1px solid var(--ao3-card-border);
+      background: #ffffff;
+    }
+
+    .pdf-nav-controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    /* EPUB Viewer */
+    #epub-viewer-wrapper {
+      display: none;
+      width: 100%;
+      height: 75vh;
+      border: 1px solid var(--ao3-card-border);
+      border-radius: 4px;
+      position: relative;
+      background: var(--ao3-bg);
+    }
+
+    #epub-viewer-area {
+      width: 100%;
+      height: 100%;
+    }
+
+    .epub-floating-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.4);
+      color: white;
+      border: none;
+      font-size: 24px;
+      width: 40px;
+      height: 48px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease;
+      z-index: 10;
+    }
+
+    .epub-floating-nav:hover {
+      background: rgba(153, 0, 0, 0.85);
+    }
+
+    .epub-prev { left: 8px; }
+    .epub-next { right: 8px; }
+
+    /* Kudos and Bookmarks section */
+    .reader-footer-actions {
+      border-top: 2px solid var(--ao3-red);
+      padding: 30px 0;
+      margin-top: 40px;
+      text-align: center;
+    }
+
+    .kudos-btn {
+      background: #ffffff;
+      color: #990000;
+      border: 2px solid #990000;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 10px 24px;
+      border-radius: 30px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 2px 6px rgba(153, 0, 0, 0.15);
+      transition: all 0.2s ease;
+    }
+
+    .kudos-btn:hover:not(:disabled) {
+      background: #990000;
+      color: #ffffff;
+      transform: scale(1.04);
+      box-shadow: 0 4px 10px rgba(153, 0, 0, 0.25);
+    }
+
+    .kudos-btn:disabled {
+      background: #eee;
+      border-color: #bbb;
+      color: #666;
+      cursor: default;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .kudos-message {
+      margin-top: 10px;
+      font-size: 14px;
+      font-style: italic;
+      color: var(--ao3-red);
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .kudos-message.visible {
+      opacity: 1;
+    }
+
+    /* Confetti Canvas */
+    #confetti-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Notification toast */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #333333;
+      color: #ffffff;
+      padding: 12px 20px;
+      border-radius: 4px;
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 3000;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    footer#ao3-footer {
+      background: var(--ao3-surface);
+      border-top: 1px solid var(--ao3-card-border);
+      padding: 18px 16px;
+      font-size: 12px;
+      color: var(--ao3-text-muted);
+      text-align: center;
+      margin-top: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Confetti Canvas -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <!-- =========================================================================
+       MAIN ARCHIVE HEADER
+       ========================================================================= -->
+  <header id="ao3-header">
+    <div class="header-top">
+      <a href="#" class="brand" onclick="goHome(); return false;">
+        <h1>Archive of Our Reads</h1>
+        <span class="sub-brand">un archivo propio para tus fics, epubs y pdfs</span>
+      </a>
+      <nav class="header-nav">
+        <button class="nav-btn active" id="nav-works" onclick="goHome()"><i class="icon">📚</i> Obras</button>
+        <button class="nav-btn" id="nav-upload" onclick="openUploadModal()"><i class="icon">⬆</i> Subir Obra</button>
+        <button class="nav-btn" id="nav-bookmarks" onclick="filterByBookmarks()"><i class="icon">🔖</i> Mis Favoritos</button>
+        <button class="nav-btn" onclick="cycleTheme()"><i class="icon">🎨</i> Skin: <span id="skin-label">AO3 Default</span></button>
+      </nav>
+    </div>
+    <div class="header-subnav">
+      <div class="header-subnav-inner">
+        <div>
+          <span>Biblioteca Local Segura &bull; Almacenamiento IndexedDB &bull; Sin conexión requerida</span>
+        </div>
+        <div class="header-search">
+          <input type="text" id="main-search-input" placeholder="Buscar por título, fandom, pairing o tag..." onkeyup="handleSearch(event)">
+          <button class="btn-search" onclick="executeSearch()">Buscar</button>
+          <button class="btn-search" style="margin-left: 4px;" onclick="resetSearch()">Limpiar</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       LIBRARY / WORKS LIST VIEW
+       ========================================================================= -->
+  <main id="main-content">
+    <div class="dashboard-header">
+      <div>
+        <h2 id="view-title">Obras Recientes</h2>
+        <span class="results-count" id="results-count-text">Cargando catálogo...</span>
+      </div>
+      <div>
+        <button class="action-btn" onclick="openUploadModal()">+ Subir Archivo (EPUB / PDF / TXT)</button>
+      </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <div>
+        <label for="filter-fandom">Fandom:</label>
+        <select id="filter-fandom" onchange="applyFilters()">
+          <option value="ALL">Todos los Fandoms</option>
+        </select>
+      </div>
+      <div>
+        <label for="filter-rating">Rating:</label>
+        <select id="filter-rating" onchange="applyFilters()">
+          <option value="ALL">Cualquier Clasificación</option>
+          <option value="General Audiences">General Audiences (G)</option>
+          <option value="Teen And Up Audiences">Teen And Up (T)</option>
+          <option value="Mature">Mature (M)</option>
+          <option value="Explicit">Explicit (E)</option>
+          <option value="Not Rated">Not Rated</option>
+        </select>
+      </div>
+      <div>
+        <label for="filter-category">Categoría:</label>
+        <select id="filter-category" onchange="applyFilters()">
+          <option value="ALL">Todas las Categorías</option>
+          <option value="F/M">F/M (Hetero)</option>
+          <option value="M/M">M/M (Slash)</option>
+          <option value="F/F">F/F (Femslash)</option>
+          <option value="Multi">Multi</option>
+          <option value="Gen">Gen (Sin romance)</option>
+        </select>
+      </div>
+      <div>
+        <label for="sort-by">Ordenar por:</label>
+        <select id="sort-by" onchange="applyFilters()">
+          <option value="date-desc">Fecha de adición (más recientes)</option>
+          <option value="title-asc">Título (A-Z)</option>
+          <option value="words-desc">Recuento de palabras (mayor a menor)</option>
+          <option value="kudos-desc">Kudos (más populares)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Works List -->
+    <div id="works-list-container">
+      <!-- Blurbs populated via JavaScript -->
+    </div>
+  </main>
+
+  <!-- =========================================================================
+       READER VIEW
+       ========================================================================= -->
+  <div id="reader-view">
+    <div class="reader-toolbar">
+      <div class="reader-toolbar-left">
+        <button class="reader-btn" onclick="exitReader()">&larr; Volver al Archivo</button>
+        <span class="reader-title-badge" id="reader-nav-title">Título de la Obra</span>
+      </div>
+
+      <div class="reader-toolbar-right">
+        <!-- Font sizing -->
+        <button class="reader-btn" title="Disminuir letra" onclick="changeFontSize(-1)">A-</button>
+        <button class="reader-btn" title="Aumentar letra" onclick="changeFontSize(1)">A+</button>
+        
+        <!-- Font family -->
+        <select class="reader-btn" id="reader-font-select" onchange="changeFontFamily(this.value)">
+          <option value="serif">Georgia (Serif AO3)</option>
+          <option value="sans">Lucida Grande (Sans)</option>
+          <option value="opendyslexic">Sans Accesible</option>
+        </select>
+
+        <!-- Width Toggle -->
+        <button class="reader-btn" id="reader-width-btn" onclick="toggleReaderWidth()" title="Ancho de lectura">Ancho: Normal</button>
+
+        <!-- PDF Controls (shown if PDF) -->
+        <div id="pdf-header-controls" style="display:none; gap:4px; align-items:center;">
+          <button class="reader-btn" onclick="prevPdfPage()">&lt; Pág</button>
+          <span style="font-size:12px; margin:0 4px;" id="pdf-page-num-display">1 / 1</span>
+          <button class="reader-btn" onclick="nextPdfPage()">Pág &gt;</button>
+          <button class="reader-btn" onclick="zoomPdf(0.15)">🔍+</button>
+          <button class="reader-btn" onclick="zoomPdf(-0.15)">🔍-</button>
+        </div>
+
+        <!-- EPUB Controls (shown if EPUB) -->
+        <div id="epub-header-controls" style="display:none; gap:4px; align-items:center;">
+          <button class="reader-btn" onclick="epubPrevPage()">&lt; Ant</button>
+          <button class="reader-btn" onclick="epubNextPage()">Sig &gt;</button>
+        </div>
+
+        <!-- Skin cycler in reader -->
+        <button class="reader-btn" onclick="cycleTheme()"><i class="icon">🎨</i> Skin</button>
+        
+        <!-- Download original file -->
+        <button class="reader-btn" id="reader-download-file-btn" onclick="downloadCurrentWorkFile()">💾 Guardar Archivo</button>
+      </div>
+    </div>
+
+    <div class="reader-container" id="reader-main-container">
+      <!-- AO3 Preface / Header info -->
+      <div class="reader-fic-preface" id="reader-preface">
+        <h2 id="reader-work-title">Título</h2>
+        <div class="preface-byline">por <strong id="reader-work-author">Autor</strong></div>
+
+        <div class="preface-meta">
+          <div><strong>Fandom:</strong> <span id="reader-meta-fandom"></span></div>
+          <div><strong>Rating:</strong> <span id="reader-meta-rating"></span></div>
+          <div><strong>Categoría:</strong> <span id="reader-meta-category"></span></div>
+          <div><strong>Advertencias:</strong> <span id="reader-meta-warnings"></span></div>
+          <div id="reader-meta-rel-row"><strong>Relaciones:</strong> <span id="reader-meta-relationships"></span></div>
+          <div id="reader-meta-char-row"><strong>Personajes:</strong> <span id="reader-meta-characters"></span></div>
+          <div id="reader-meta-tags-row"><strong>Tags Adicionales:</strong> <span id="reader-meta-tags"></span></div>
+        </div>
+
+        <div class="preface-summary">
+          <strong>Resumen:</strong>
+          <div id="reader-work-summary" style="margin-top:4px;"></div>
+        </div>
+      </div>
+
+      <!-- TEXT / HTML READER CONTAINER -->
+      <div id="text-content-area"></div>
+
+      <!-- PDF VIEWER CONTAINER -->
+      <div id="pdf-viewer-wrapper">
+        <div class="pdf-nav-controls">
+          <button class="reader-btn" onclick="prevPdfPage()">&larr; Página Anterior</button>
+          <span id="pdf-page-indicator">Página 1 de 1</span>
+          <button class="reader-btn" onclick="nextPdfPage()">Página Siguiente &rarr;</button>
+        </div>
+        <canvas id="pdf-canvas"></canvas>
+      </div>
+
+      <!-- EPUB VIEWER CONTAINER -->
+      <div id="epub-viewer-wrapper">
+        <button class="epub-floating-nav epub-prev" onclick="epubPrevPage()" title="Capítulo Anterior">&#10094;</button>
+        <button class="epub-floating-nav epub-next" onclick="epubNextPage()" title="Capítulo Siguiente">&#10095;</button>
+        <div id="epub-viewer-area"></div>
+      </div>
+
+      <!-- AO3 KUDOS & STATS FOOTER -->
+      <div class="reader-footer-actions">
+        <button class="kudos-btn" id="kudos-button" onclick="giveKudos()">
+          <span style="font-size:18px;">♥</span> Kudos (<span id="kudos-counter">0</span>)
+        </button>
+        <div class="kudos-message" id="kudos-thankyou">¡Muchas gracias por dejar kudos! &lt;3</div>
+
+        <div style="margin-top:20px; font-size:12px; color:var(--ao3-text-muted);">
+          <span>¿Te gustó la historia? Añádela a tus favoritos en la biblioteca para leerla cuando quieras sin internet.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODAL: UPLOAD WORK / SUBIR OBRA
+       ========================================================================= -->
+  <div class="modal-overlay" id="upload-modal">
+    <div class="modal-card">
+      <div class="modal-title">
+        <span>Subir Nueva Obra al Archivo</span>
+        <button class="close-modal-btn" onclick="closeUploadModal()">&times;</button>
+      </div>
+
+      <div class="file-dropzone" id="file-dropzone" onclick="document.getElementById('file-input').click()">
+        <div class="dropzone-icon">📥</div>
+        <p><strong>Haz clic o arrastra aquí tu archivo</strong></p>
+        <p style="color:var(--ao3-text-muted); font-size:12px;">Soporta archivos <strong>.EPUB</strong>, <strong>.PDF</strong>, <strong>.TXT</strong> y <strong>.HTML</strong></p>
+        <input type="file" id="file-input" accept=".epub,.pdf,.txt,.html,.htm" style="display:none;" onchange="handleFileSelect(event)">
+        <p id="file-selected-name" style="margin-top:8px; font-weight:bold; color:var(--ao3-red);"></p>
+      </div>
+
+      <form id="upload-form" onsubmit="saveNewWork(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="work-title-input">Título de la Obra *</label>
+            <input type="text" class="form-control" id="work-title-input" required placeholder="Ej: Ineffable Nights">
+          </div>
+          <div class="form-group">
+            <label for="work-author-input">Autor / Pseudónimo *</label>
+            <input type="text" class="form-control" id="work-author-input" required placeholder="Ej: Anonymous, Autor..." value="Anónimo">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="work-fandom-input">Fandom(s) *</label>
+            <input type="text" class="form-control" id="work-fandom-input" required placeholder="Ej: Good Omens, Harry Potter, Original Work">
+          </div>
+          <div class="form-group">
+            <label for="work-rating-input">Clasificación (Rating) *</label>
+            <select class="form-control" id="work-rating-input">
+              <option value="General Audiences">General Audiences (Todo público)</option>
+              <option value="Teen And Up Audiences" selected>Teen And Up Audiences (Adolescentes)</option>
+              <option value="Mature">Mature (Maduro)</option>
+              <option value="Explicit">Explicit (Explícito)</option>
+              <option value="Not Rated">Not Rated (Sin clasificar)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="work-category-input">Categoría de Relación</label>
+            <select class="form-control" id="work-category-input">
+              <option value="M/M">M/M (Hombre / Hombre)</option>
+              <option value="F/M">F/M (Mujer / Hombre)</option>
+              <option value="F/F">F/F (Mujer / Mujer)</option>
+              <option value="Multi">Multi (Múltiples parejas)</option>
+              <option value="Gen">Gen (General / Sin romance principal)</option>
+              <option value="Other">Otro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="work-warnings-input">Advertencias de Archivo</label>
+            <select class="form-control" id="work-warnings-input">
+              <option value="No Archive Warnings Apply">No Archive Warnings Apply (Sin advertencias graves)</option>
+              <option value="Choose Not To Use Archive Warnings">Author Chose Not To Use Archive Warnings</option>
+              <option value="Major Character Death">Major Character Death</option>
+              <option value="Graphic Depictions Of Violence">Graphic Depictions Of Violence</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="work-rel-input">Relaciones (Pairings)</label>
+          <input type="text" class="form-control" id="work-rel-input" placeholder="Separadas por comas. Ej: Crowley/Aziraphale, Colin Bridgerton/Penelope Featherington">
+        </div>
+
+        <div class="form-group">
+          <label for="work-char-input">Personajes</label>
+          <input type="text" class="form-control" id="work-char-input" placeholder="Separados por comas. Ej: Crowley, Aziraphale, Harry Potter">
+        </div>
+
+        <div class="form-group">
+          <label for="work-tags-input">Tags Adicionales / Freeform</label>
+          <input type="text" class="form-control" id="work-tags-input" placeholder="Separados por comas. Ej: Fluff, Hurt/Comfort, Slow Burn, Alternate Universe">
+        </div>
+
+        <div class="form-group">
+          <label for="work-summary-input">Resumen (Summary)</label>
+          <textarea class="form-control" id="work-summary-input" rows="3" placeholder="Una breve sinopsis o extracto que atrape a los lectores..."></textarea>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:16px;">
+          <button type="button" class="action-btn btn-secondary" onclick="closeUploadModal()">Cancelar</button>
+          <button type="submit" class="action-btn" id="btn-submit-work">Publicar y Guardar en Archivo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast element -->
+  <div class="toast" id="toast-notification">Notificación</div>
+
+  <!-- FOOTER -->
+  <footer id="ao3-footer">
+    <p><strong>Archive of Our Reads</strong> &bull; Basado fielmente en el diseño, espíritu y estructura de metadatos de <em>Archive of Our Own</em> (AO3).</p>
+    <p style="margin-top:4px;">Los archivos se almacenan localmente en tu navegador mediante IndexedDB. No se envía información a servidores externos.</p>
+  </footer>
+
+  <!-- =========================================================================
+       JAVASCRIPT APPLICATION LOGIC
+       ========================================================================= -->
+  <script>
+    /* --------------------------------------------------------------------------
+       DATABASE INITIALIZATION (IndexedDB)
+       -------------------------------------------------------------------------- */
+    const DB_NAME = 'AO3_Archive_Reader_DB';
+    const DB_VERSION = 1;
+    let dbInstance = null;
+    let currentWork = null;
+    let allWorks = [];
+    let currentFilterBookmarkOnly = false;
+
+    // PDF Viewer States
+    let currentPdfDoc = null;
+    let currentPdfPage = 1;
+    let totalPdfPages = 1;
+    let pdfScale = 1.25;
+
+    // EPUB Viewer States
+    let currentEpubBook = null;
+    let currentEpubRendition = null;
+
+    // Theme state
+    const THEMES = ['default', 'reversi', 'sepia'];
+    let currentThemeIndex = 0;
+
+    // Initialize Database
+    function openDatabase() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('works')) {
+            const store = db.createObjectStore('works', { keyPath: 'id', autoIncrement: true });
+            store.createIndex('fandom', 'fandom', { unique: false });
+            store.createIndex('rating', 'rating', { unique: false });
+            store.createIndex('title', 'title', { unique: false });
+            store.createIndex('dateAdded', 'dateAdded', { unique: false });
+          }
+        };
+        req.onsuccess = (e) => {
+          dbInstance = e.target.result;
+          resolve(dbInstance);
+        };
+        req.onerror = (e) => {
+          console.error("IndexedDB error:", e);
+          reject(e);
+        };
+      });
+    }
+
+    /* --------------------------------------------------------------------------
+       PRE-LOAD SAMPLE WORKS IF EMPTY
+       -------------------------------------------------------------------------- */
+    const SAMPLE_WORKS = [
+      {
+        title: "The Physics of Second Chances",
+        author: "Constellation_Wanderer",
+        fandom: "Good Omens (TV)",
+        rating: "Teen And Up Audiences",
+        category: "M/M",
+        warnings: "No Archive Warnings Apply",
+        relationships: ["Aziraphale/Crowley"],
+        characters: ["Aziraphale", "Crowley", "Muriel"],
+        tags: ["Alternate Universe - Coffee Shop", "Slow Burn", "Mutual Pining", "Hot Chocolate", "Fluff with Plot"],
+        summary: "Crowley never expected the antique bookshop on the corner of Whickber Street to smell like cinnamon, old parchment, and an angel's gentle smile. Aziraphale, on the other hand, knows miracles happen in very subtle ways.",
+        wordCount: 8420,
+        chapters: "1/1",
+        kudos: 342,
+        hits: 1580,
+        bookmarks: true,
+        fileType: "text/plain",
+        fileName: "Physics_of_Second_Chances.txt",
+        dateAdded: Date.now() - 86400000 * 2,
+        hasKudoed: false,
+        textContent: `CAPÍTULO 1: LA CONSTANTE DE LOS MILAGROS
+
+La campana de latón sobre la puerta del viejo local emitió un tintineo agudo cuando Crowley empujó el cristal esmerilado. Afuera, la lluvia de Soho caía con esa insistencia grisácea tan propia de Londres un martes por la tarde.
+
+Detrás del mostrador de caoba, rodeado por pilas tambaleantes de primeras ediciones encuadernadas en piel, emergió una figura con chaleco de tweed y una taza de té humeante entre las manos.
+
+—Buenas tardes —dijo Aziraphale. Su voz poseía esa calidez redonda y reconfortante de quien jamás ha tenido prisa en los últimos seis mil años—. Me temo que hoy estamos técnicamente cerrados por inventario, pero si busca refugio del aguacero...
+
+Crowley se bajó las gafas oscuras medio milímetro por el puente de la nariz. Sus ojos dorados brillaron con una chispa peligrosa, casi felina.
+
+—¿Cerrados? ¿Con el cartel de "Abierto" colgado al revés en la ventana, ángel?
+
+Aziraphale parpadeó, desconcertado por el apelativo y por la repentina sensación eléctrica que acababa de cruzar la librería. Miró hacia la puerta, luego hacia el extraño de chaqueta negra y zancadas elásticas.
+
+—Vaya. Parece que he cometido un error de cálculo —murmuró el librero, ofreciendo una sonrisa tímida—. En ese caso, supongo que el universo insiste en que compartamos el té. Tome asiento, señor...
+
+—Crowley. Solo Crowley.
+
+Y en ese instante, en medio de la penumbra perfumada a vainilla y polvo de estrellas, el tiempo pareció detenerse exactamente donde debía comenzar.`
+      },
+      {
+        title: "A Study in Tea and Moonlight",
+        author: "BakerStreetStrings",
+        fandom: "Sherlock (TV)",
+        rating: "General Audiences",
+        category: "Gen",
+        warnings: "No Archive Warnings Apply",
+        relationships: ["Sherlock Holmes & John Watson"],
+        characters: ["Sherlock Holmes", "John Watson", "Mrs. Hudson"],
+        tags: ["Domestic", "Post-Case Recovery", "Violin Music", "Comfort", "Friendship"],
+        summary: "Three in the morning in 221B Baker Street. The case of the Dartmoor emerald is solved, the tea is piping hot, and Sherlock's violin finally plays a melody that John can recognize.",
+        wordCount: 5120,
+        chapters: "1/1",
+        kudos: 219,
+        hits: 940,
+        bookmarks: false,
+        fileType: "text/plain",
+        fileName: "A_Study_in_Tea_and_Moonlight.txt",
+        dateAdded: Date.now() - 86400000 * 5,
+        hasKudoed: false,
+        textContent: `El fuego crepitaba en la chimenea de 221B, proyectando sombras alargadas sobre el papel tapiz desgastado.
+
+John Watson dejó caer su libreta sobre la mesita auxiliar y suspiró hondo, estirando las piernas cansadas tras setenta y dos horas ininterrumpidas de persecución en los páramos.
+
+Sherlock permanecía inmóvil junto a la ventana, recortado contra el resplandor plomizo de las farolas londinenses. El arco del violín se movía sobre las cuerdas con una precisión hipnótica: una frase musical suave, casi nostálgica, sin rastros de la furia intelectual con la que solía tocar cuando el aburrimiento lo devoraba.
+
+—¿No vas a dormir, Sherlock? —preguntó John con voz ronca.
+
+El detective no interrumpió la nota final. Dejó descansar el instrumento sobre el regazo y ladeó la cabeza.
+
+—Dormir es un desperdicio biológico innecesario cuando el cerebro acaba de catalogar un espectro químico completamente nuevo, John.
+
+—Claro, por supuesto. Y tus ojos hinchados son solo una alucinación de mi córnea —replicó John con ironía afectuosa, empujando la segunda taza de té humeante hacia el borde de la mesa—. Bébete esto antes de que se enfríe.`
+      },
+      {
+        title: "Stars in the Restricted Section",
+        author: "MoonyAndStars",
+        fandom: "Harry Potter - J. K. Rowling",
+        rating: "Teen And Up Audiences",
+        category: "M/M",
+        warnings: "No Archive Warnings Apply",
+        relationships: ["Remus Lupin/Sirius Black"],
+        characters: ["Remus Lupin", "Sirius Black", "James Potter", "Peter Pettigrew"],
+        tags: ["Hogwarts Era", "Marauders", "Late Night Conversations", "Library", "Stolen Moments"],
+        summary: "Midnight curfew meant nothing to Sirius Black, especially when Remus was quietly reading by wandlight under the astronomy charts of section 4B.",
+        wordCount: 6840,
+        chapters: "1/1",
+        kudos: 512,
+        hits: 2310,
+        bookmarks: true,
+        fileType: "text/plain",
+        fileName: "Stars_in_Restricted_Section.txt",
+        dateAdded: Date.now() - 86400000 * 8,
+        hasKudoed: false,
+        textContent: `El silencio de la biblioteca de Hogwarts a la una de la madrugada tenía un peso casi sagrado.
+
+Remus Lupin mantenía la punta de su varita iluminada con un 'Lumos' diminuto, apenas más brillante que una luciérnaga de verano. Pasaba la yema de los dedos sobre las runas antiguas de un grimorio de astronomía cuando una mano conocida se deslizó sobre su hombro.
+
+—Te encontré, Lunático —susurró una voz cargada de complicidad traviesa.
+
+Sirius se deslizó silenciosamente a su lado, oliendo a brisa nocturna y a humo de chimenea de Gryffindor. Llevaba la túnica desabrochada y esa sonrisa insolente que siempre lograba que el pulso de Remus se acelerara el doble.
+
+—Madame Pince te colgará de los pulgares si nos atrapa aquí —reprendió Remus en un susurro, aunque sus labios traicionaron una media sonrisa.
+
+—Que lo intente. James y Peter están vigilando el mapa en el pasillo del tercer piso. Además... no podía dormir sin ver cómo resolvías la alineación de Saturno.`
+      }
+    ];
+
+    async function checkAndSeedDatabase() {
+      const works = await getAllWorksFromDB();
+      if (works.length === 0) {
+        for (const sample of SAMPLE_WORKS) {
+          await addWorkToDB(sample);
+        }
+      }
+    }
+
+    /* --------------------------------------------------------------------------
+       INDEXEDDB CRUD METHODS
+       -------------------------------------------------------------------------- */
+    function getAllWorksFromDB() {
+      return new Promise((resolve, reject) => {
+        const tx = dbInstance.transaction('works', 'readonly');
+        const store = tx.objectStore('works');
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    function addWorkToDB(workObj) {
+      return new Promise((resolve, reject) => {
+        const tx = dbInstance.transaction('works', 'readwrite');
+        const store = tx.objectStore('works');
+        const req = store.add(workObj);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    function updateWorkInDB(workObj) {
+      return new Promise((resolve, reject) => {
+        const tx = dbInstance.transaction('works', 'readwrite');
+        const store = tx.objectStore('works');
+        const req = store.put(workObj);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    function deleteWorkFromDB(id) {
+      return new Promise((resolve, reject) => {
+        const tx = dbInstance.transaction('works', 'readwrite');
+        const store = tx.objectStore('works');
+        const req = store.delete(id);
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    /* --------------------------------------------------------------------------
+       UI RENDERING - WORKS LIST & BLURBS
+       -------------------------------------------------------------------------- */
+    function getRatingBadgeInfo(rating) {
+      switch(rating) {
+        case 'General Audiences': return { class: 'quad-general', label: 'G', tooltip: 'General Audiences' };
+        case 'Teen And Up Audiences': return { class: 'quad-teen', label: 'T', tooltip: 'Teen And Up Audiences' };
+        case 'Mature': return { class: 'quad-mature', label: 'M', tooltip: 'Mature' };
+        case 'Explicit': return { class: 'quad-explicit', label: 'E', tooltip: 'Explicit' };
+        default: return { class: 'quad-notrated', label: 'NR', tooltip: 'Not Rated' };
+      }
+    }
+
+    function getCategoryBadgeInfo(category) {
+      switch(category) {
+        case 'M/M': return { class: 'quad-mm', label: 'M/M', tooltip: 'Male / Male' };
+        case 'F/M': return { class: 'quad-fm', label: 'F/M', tooltip: 'Female / Male' };
+        case 'F/F': return { class: 'quad-ff', label: 'F/F', tooltip: 'Female / Female' };
+        case 'Multi': return { class: 'quad-multi', label: 'Multi', tooltip: 'Multiple Relationships' };
+        case 'Gen': return { class: 'quad-gen', label: 'Gen', tooltip: 'General / No romantic relationship' };
+        default: return { class: 'quad-cat-none', label: '&bull;', tooltip: 'Other / None' };
+      }
+    }
+
+    function getWarningBadgeInfo(warning) {
+      if (!warning || warning === 'No Archive Warnings Apply') {
+        return { class: 'quad-warn-no', label: '', tooltip: 'No Archive Warnings Apply' };
+      }
+      return { class: 'quad-warn-yes', label: '!', tooltip: warning };
+    }
+
+    async function loadWorksList() {
+      allWorks = await getAllWorksFromDB();
+      populateFandomDropdown(allWorks);
+      applyFilters();
+    }
+
+    function populateFandomDropdown(works) {
+      const select = document.getElementById('filter-fandom');
+      const currentVal = select.value;
+      const fandomSet = new Set();
+      works.forEach(w => {
+        if (w.fandom) fandomSet.add(w.fandom);
+      });
+
+      select.innerHTML = '<option value="ALL">Todos los Fandoms</option>';
+      Array.from(fandomSet).sort().forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f;
+        opt.textContent = f;
+        select.appendChild(opt);
+      });
+
+      if (fandomSet.has(currentVal)) {
+        select.value = currentVal;
+      }
+    }
+
+    function applyFilters() {
+      const fandomFilter = document.getElementById('filter-fandom').value;
+      const ratingFilter = document.getElementById('filter-rating').value;
+      const categoryFilter = document.getElementById('filter-category').value;
+      const sortBy = document.getElementById('sort-by').value;
+      const searchInput = document.getElementById('main-search-input').value.toLowerCase().trim();
+
+      let filtered = [...allWorks];
+
+      // Bookmarks only mode
+      if (currentFilterBookmarkOnly) {
+        filtered = filtered.filter(w => w.bookmarks === true);
+        document.getElementById('view-title').textContent = "Mis Obras Favoritas (Bookmarks)";
+      } else {
+        document.getElementById('view-title').textContent = "Obras Recientes";
+      }
+
+      // Fandom
+      if (fandomFilter !== 'ALL') {
+        filtered = filtered.filter(w => w.fandom === fandomFilter);
+      }
+
+      // Rating
+      if (ratingFilter !== 'ALL') {
+        filtered = filtered.filter(w => w.rating === ratingFilter);
+      }
+
+      // Category
+      if (categoryFilter !== 'ALL') {
+        filtered = filtered.filter(w => w.category === categoryFilter);
+      }
+
+      // Text Search
+      if (searchInput) {
+        filtered = filtered.filter(w => {
+          const t = (w.title || '').toLowerCase();
+          const a = (w.author || '').toLowerCase();
+          const f = (w.fandom || '').toLowerCase();
+          const r = (w.relationships || []).join(' ').toLowerCase();
+          const c = (w.characters || []).join(' ').toLowerCase();
+          const tags = (w.tags || []).join(' ').toLowerCase();
+          const s = (w.summary || '').toLowerCase();
+          return t.includes(searchInput) || a.includes(searchInput) || f.includes(searchInput) || 
+                 r.includes(searchInput) || c.includes(searchInput) || tags.includes(searchInput) || s.includes(searchInput);
+        });
+      }
+
+      // Sorting
+      if (sortBy === 'date-desc') {
+        filtered.sort((a, b) => (b.dateAdded || 0) - (a.dateAdded || 0));
+      } else if (sortBy === 'title-asc') {
+        filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+      } else if (sortBy === 'words-desc') {
+        filtered.sort((a, b) => (b.wordCount || 0) - (a.wordCount || 0));
+      } else if (sortBy === 'kudos-desc') {
+        filtered.sort((a, b) => (b.kudos || 0) - (a.kudos || 0));
+      }
+
+      renderWorks(filtered);
+    }
+
+    function renderWorks(works) {
+      const container = document.getElementById('works-list-container');
+      const countText = document.getElementById('results-count-text');
+      
+      countText.textContent = `${works.length} obra${works.length === 1 ? '' : 's'} encontrada${works.length === 1 ? '' : 's'}`;
+
+      if (works.length === 0) {
+        container.innerHTML = `
+          <div style="background:var(--ao3-surface); border:1px solid var(--ao3-card-border); padding:30px; text-align:center; border-radius:4px; margin-top:16px;">
+            <p style="font-size:16px; font-family:var(--ao3-font-serif); margin-bottom:8px;">No se encontraron obras que coincidan con los filtros.</p>
+            <p style="font-size:13px; color:var(--ao3-text-muted);">Puedes subir un nuevo archivo .EPUB o .PDF haciendo clic en <strong>Subir Obra</strong> en la barra superior.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = works.map(w => {
+        const rating = getRatingBadgeInfo(w.rating);
+        const cat = getCategoryBadgeInfo(w.category);
+        const warn = getWarningBadgeInfo(w.warnings);
+        const comp = { class: 'quad-complete', label: '✓', tooltip: 'Completed Work' };
+
+        // Tag pills
+        const warnTag = w.warnings && w.warnings !== 'No Archive Warnings Apply' ? 
+          `<span class="tag-pill warning-tag" title="Advertencia de archivo">${escapeHtml(w.warnings)}</span>` : 
+          `<span class="tag-pill warning-tag" style="color:var(--ao3-text-muted);">Sin advertencias aplicables</span>`;
+
+        const relTags = (w.relationships || []).map(r => 
+          `<span class="tag-pill relationship-tag" onclick="filterByTag('${escapeHtml(r)}', event)">${escapeHtml(r)}</span>`
+        ).join('');
+
+        const charTags = (w.characters || []).map(c => 
+          `<span class="tag-pill character-tag" onclick="filterByTag('${escapeHtml(c)}', event)">${escapeHtml(c)}</span>`
+        ).join('');
+
+        const freeTags = (w.tags || []).map(t => 
+          `<span class="tag-pill" onclick="filterByTag('${escapeHtml(t)}', event)">${escapeHtml(t)}</span>`
+        ).join('');
+
+        const bookmarkActive = w.bookmarks ? 'active' : '';
+
+        // File format badge
+        const fileExt = (w.fileName || '').split('.').pop().toUpperCase() || 'TXT';
+
+        return `
+          <article class="work-blurb" id="work-blurb-${w.id}">
+            <!-- 4-Quadrant Badge -->
+            <div class="required-tags">
+              <div class="rating-quadrant ${rating.class}" title="${rating.tooltip}">${rating.label}</div>
+              <div class="rating-quadrant ${cat.class}" title="${cat.tooltip}">${cat.label}</div>
+              <div class="rating-quadrant ${warn.class}" title="${warn.tooltip}">${warn.label}</div>
+              <div class="rating-quadrant ${comp.class}" title="${comp.tooltip}">${comp.label}</div>
+            </div>
+
+            <!-- Blurb Content -->
+            <div class="blurb-main">
+              <div class="blurb-header">
+                <a href="#" class="work-title" onclick="openReaderForWork(${w.id}); return false;">${escapeHtml(w.title)}</a>
+                <span class="work-author">por <strong>${escapeHtml(w.author)}</strong></span>
+                <div class="fandom-tags">
+                  <span>Fandom: <a href="#" onclick="filterByFandomTag('${escapeHtml(w.fandom)}'); return false;">${escapeHtml(w.fandom)}</a></span>
+                  <span style="display:inline-block; margin-left:8px; background:var(--ao3-card-border); color:var(--ao3-text); font-size:10px; padding:1px 5px; border-radius:3px;">${fileExt}</span>
+                </div>
+              </div>
+
+              <!-- Tags -->
+              <div class="tags-container">
+                ${warnTag}
+                ${relTags}
+                ${charTags}
+                ${freeTags}
+              </div>
+
+              <!-- Summary -->
+              ${w.summary ? `<blockquote class="blurb-summary">${escapeHtml(w.summary)}</blockquote>` : ''}
+
+              <!-- Stats Bar -->
+              <div class="blurb-stats">
+                <span>Idioma: <strong>Español</strong></span>
+                <span>Palabras: <strong>${(w.wordCount || 0).toLocaleString()}</strong></span>
+                <span>Capítulos: <strong>${w.chapters || '1/1'}</strong></span>
+                <span>Kudos: <strong id="blurb-kudos-${w.id}">${w.kudos || 0}</strong></span>
+                <span>Hits: <strong>${(w.hits || 0).toLocaleString()}</strong></span>
+              </div>
+
+              <!-- Actions -->
+              <div class="blurb-actions">
+                <button class="action-btn" onclick="openReaderForWork(${w.id})">📖 Leer Online</button>
+                <button class="action-btn btn-secondary ${bookmarkActive}" onclick="toggleBookmark(${w.id}, event)">
+                  ${w.bookmarks ? '★ Guardado' : '☆ Favorito'}
+                </button>
+                <button class="action-btn btn-secondary" onclick="exportWorkFile(${w.id})">⬇ Descargar</button>
+                <button class="action-btn btn-danger" onclick="deleteWork(${w.id})" title="Eliminar de mi biblioteca">&times; Eliminar</button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
+    /* --------------------------------------------------------------------------
+       SEARCH & FILTERS
+       -------------------------------------------------------------------------- */
+    function handleSearch(e) {
+      if (e.key === 'Enter') {
+        applyFilters();
+      }
+    }
+
+    function executeSearch() {
+      applyFilters();
+    }
+
+    function resetSearch() {
+      document.getElementById('main-search-input').value = '';
+      document.getElementById('filter-fandom').value = 'ALL';
+      document.getElementById('filter-rating').value = 'ALL';
+      document.getElementById('filter-category').value = 'ALL';
+      currentFilterBookmarkOnly = false;
+      applyFilters();
+      showToast("Filtros reestablecidos");
+    }
+
+    function filterByBookmarks() {
+      currentFilterBookmarkOnly = !currentFilterBookmarkOnly;
+      const btn = document.getElementById('nav-bookmarks');
+      if (currentFilterBookmarkOnly) {
+        btn.classList.add('active');
+        document.getElementById('nav-works').classList.remove('active');
+      } else {
+        btn.classList.remove('active');
+        document.getElementById('nav-works').classList.add('active');
+      }
+      applyFilters();
+    }
+
+    function filterByTag(tagName, e) {
+      if (e) e.stopPropagation();
+      document.getElementById('main-search-input').value = tagName;
+      applyFilters();
+    }
+
+    function filterByFandomTag(fandomName) {
+      const select = document.getElementById('filter-fandom');
+      select.value = fandomName;
+      if (select.value !== fandomName) {
+        // If not exact match in options, put in search bar
+        document.getElementById('main-search-input').value = fandomName;
+      }
+      applyFilters();
+    }
+
+    /* --------------------------------------------------------------------------
+       MODAL: FILE UPLOAD & PARSING
+       -------------------------------------------------------------------------- */
+    let stagedFileData = null;
+
+    function openUploadModal() {
+      document.getElementById('upload-modal').classList.add('active');
+    }
+
+    function closeUploadModal() {
+      document.getElementById('upload-modal').classList.remove('active');
+      document.getElementById('upload-form').reset();
+      document.getElementById('file-selected-name').textContent = '';
+      stagedFileData = null;
+    }
+
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      processSelectedFile(file);
+    }
+
+    // Drag and Drop
+    const dropzone = document.getElementById('file-dropzone');
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        processSelectedFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    async function processSelectedFile(file) {
+      stagedFileData = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        rawBlob: file
+      };
+
+      const titleInput = document.getElementById('work-title-input');
+      const cleanTitle = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+      if (!titleInput.value) {
+        titleInput.value = cleanTitle;
+      }
+
+      document.getElementById('file-selected-name').textContent = `✓ Archivo cargado: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      showToast(`Archivo ${file.name} listo para subir.`);
+    }
+
+    async function saveNewWork(e) {
+      e.preventDefault();
+
+      const title = document.getElementById('work-title-input').value.trim();
+      const author = document.getElementById('work-author-input').value.trim() || 'Anónimo';
+      const fandom = document.getElementById('work-fandom-input').value.trim() || 'Original Work';
+      const rating = document.getElementById('work-rating-input').value;
+      const category = document.getElementById('work-category-input').value;
+      const warnings = document.getElementById('work-warnings-input').value;
+
+      const relRaw = document.getElementById('work-rel-input').value;
+      const relationships = relRaw ? relRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+      const charRaw = document.getElementById('work-char-input').value;
+      const characters = charRaw ? charRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+      const tagsRaw = document.getElementById('work-tags-input').value;
+      const tags = tagsRaw ? tagsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+      const summary = document.getElementById('work-summary-input').value.trim();
+
+      // Estimate words or read text if txt/html
+      let textContent = '';
+      let wordCount = 1000;
+      let rawFileBlob = stagedFileData ? stagedFileData.rawBlob : null;
+      let fileName = stagedFileData ? stagedFileData.name : `${title}.txt`;
+      let fileType = stagedFileData ? stagedFileData.type : 'text/plain';
+
+      if (rawFileBlob) {
+        if (rawFileBlob.type.includes('text') || fileName.endsWith('.txt') || fileName.endsWith('.html')) {
+          textContent = await rawFileBlob.text();
+          wordCount = textContent.trim().split(/\s+/).length;
+        } else {
+          // Approximation for PDF/EPUB if not parsed immediately
+          wordCount = Math.max(800, Math.round(stagedFileData.size / 6));
+        }
+      } else {
+        textContent = "Contenido de muestra añadido por el usuario.";
+      }
+
+      const newWork = {
+        title,
+        author,
+        fandom,
+        rating,
+        category,
+        warnings,
+        relationships,
+        characters,
+        tags,
+        summary,
+        wordCount,
+        chapters: "1/1",
+        kudos: 0,
+        hits: 1,
+        bookmarks: false,
+        fileType,
+        fileName,
+        dateAdded: Date.now(),
+        hasKudoed: false,
+        fileBlob: rawFileBlob,
+        textContent
+      };
+
+      await addWorkToDB(newWork);
+      closeUploadModal();
+      showToast("¡Obra publicada con éxito en tu archivo local!");
+      await loadWorksList();
+    }
+
+    /* --------------------------------------------------------------------------
+       READER VIEW ENGINE (EPUB / PDF / TEXT)
+       -------------------------------------------------------------------------- */
+    async function openReaderForWork(workId) {
+      currentWork = allWorks.find(w => w.id === workId);
+      if (!currentWork) return;
+
+      // Increment hits
+      currentWork.hits = (currentWork.hits || 0) + 1;
+      await updateWorkInDB(currentWork);
+
+      // Setup UI
+      document.getElementById('main-content').style.display = 'none';
+      document.getElementById('ao3-header').style.display = 'none';
+      document.getElementById('reader-view').classList.add('active');
+      window.scrollTo(0, 0);
+
+      // Populate Preface Info
+      document.getElementById('reader-nav-title').textContent = currentWork.title;
+      document.getElementById('reader-work-title').textContent = currentWork.title;
+      document.getElementById('reader-work-author').textContent = currentWork.author;
+      document.getElementById('reader-meta-fandom').textContent = currentWork.fandom;
+      document.getElementById('reader-meta-rating').textContent = currentWork.rating;
+      document.getElementById('reader-meta-category').textContent = currentWork.category;
+      document.getElementById('reader-meta-warnings').textContent = currentWork.warnings || 'None';
+
+      const relRow = document.getElementById('reader-meta-rel-row');
+      if (currentWork.relationships && currentWork.relationships.length > 0) {
+        relRow.style.display = 'block';
+        document.getElementById('reader-meta-relationships').textContent = currentWork.relationships.join(', ');
+      } else {
+        relRow.style.display = 'none';
+      }
+
+      const charRow = document.getElementById('reader-meta-char-row');
+      if (currentWork.characters && currentWork.characters.length > 0) {
+        charRow.style.display = 'block';
+        document.getElementById('reader-meta-characters').textContent = currentWork.characters.join(', ');
+      } else {
+        charRow.style.display = 'none';
+      }
+
+      const tagsRow = document.getElementById('reader-meta-tags-row');
+      if (currentWork.tags && currentWork.tags.length > 0) {
+        tagsRow.style.display = 'block';
+        document.getElementById('reader-meta-tags').textContent = currentWork.tags.join(', ');
+      } else {
+        tagsRow.style.display = 'none';
+      }
+
+      document.getElementById('reader-work-summary').textContent = currentWork.summary || 'Sin resumen.';
+
+      // Kudos State
+      document.getElementById('kudos-counter').textContent = currentWork.kudos || 0;
+      const kudoBtn = document.getElementById('kudos-button');
+      if (currentWork.hasKudoed) {
+        kudoBtn.disabled = true;
+        kudoBtn.innerHTML = '<span>♥</span> Kudos ya otorgados &lt;3';
+        document.getElementById('kudos-thankyou').classList.add('visible');
+      } else {
+        kudoBtn.disabled = false;
+        kudoBtn.innerHTML = `<span style="font-size:18px;">♥</span> Kudos (${currentWork.kudos || 0})`;
+        document.getElementById('kudos-thankyou').classList.remove('visible');
+      }
+
+      // Hide all reader sub-containers first
+      document.getElementById('text-content-area').style.display = 'none';
+      document.getElementById('pdf-viewer-wrapper').style.display = 'none';
+      document.getElementById('epub-viewer-wrapper').style.display = 'none';
+      document.getElementById('pdf-header-controls').style.display = 'none';
+      document.getElementById('epub-header-controls').style.display = 'none';
+
+      // Detect File Type and Render Accordingly
+      const fileName = (currentWork.fileName || '').toLowerCase();
+
+      if (fileName.endsWith('.pdf') || (currentWork.fileBlob && currentWork.fileBlob.type === 'application/pdf')) {
+        renderPdfWork(currentWork);
+      } else if (fileName.endsWith('.epub') || (currentWork.fileBlob && currentWork.fileBlob.type.includes('epub'))) {
+        renderEpubWork(currentWork);
+      } else {
+        renderTextWork(currentWork);
+      }
+    }
+
+    function exitReader() {
+      // Cleanup PDF & ePub instances
+      if (currentEpubBook) {
+        try { currentEpubBook.destroy(); } catch(e){}
+        currentEpubBook = null;
+        currentEpubRendition = null;
+      }
+      currentPdfDoc = null;
+
+      document.getElementById('reader-view').classList.remove('active');
+      document.getElementById('ao3-header').style.display = 'block';
+      document.getElementById('main-content').style.display = 'block';
+      loadWorksList(); // refresh counts
+    }
+
+    /* --- TEXT READER --- */
+    function renderTextWork(work) {
+      const area = document.getElementById('text-content-area');
+      area.style.display = 'block';
+
+      const content = work.textContent || 'No hay contenido disponible para esta obra.';
+      const paragraphs = content.split(/
+\s*
+/).filter(p => p.trim().length > 0);
+
+      area.innerHTML = paragraphs.map(p => {
+        if (p.startsWith('CAPÍTULO') || p.startsWith('CHAPTER') || p.startsWith('##')) {
+          return `<h3 style="margin:24px 0 12px; font-size:20px; color:var(--ao3-red); text-align:center;">${escapeHtml(p)}</h3>`;
+        }
+        return `<p>${escapeHtml(p).replace(/
+/g, '<br>')}</p>`;
+      }).join('');
+    }
+
+    /* --- PDF.JS READER --- */
+    async function renderPdfWork(work) {
+      const wrapper = document.getElementById('pdf-viewer-wrapper');
+      wrapper.style.display = 'flex';
+      document.getElementById('pdf-header-controls').style.display = 'flex';
+
+      if (!work.fileBlob) {
+        wrapper.innerHTML = '<p style="padding:20px; color:red;">El archivo binario PDF no está disponible en memoria.</p>';
+        return;
+      }
+
+      showToast("Cargando visor PDF...");
+
+      try {
+        const arrayBuffer = await work.fileBlob.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        currentPdfDoc = await loadingTask.promise;
+        totalPdfPages = currentPdfDoc.numPages;
+        currentPdfPage = 1;
+        renderCurrentPdfPage();
+      } catch (err) {
+        console.error("Error loading PDF:", err);
+        showToast("Error al procesar el archivo PDF.");
+      }
+    }
+
+    async function renderCurrentPdfPage() {
+      if (!currentPdfDoc) return;
+      const page = await currentPdfDoc.getPage(currentPdfPage);
+      const canvas = document.getElementById('pdf-canvas');
+      const ctx = canvas.getContext('2d');
+
+      const viewport = page.getViewport({ scale: pdfScale });
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      const renderContext = {
+        canvasContext: ctx,
+        viewport: viewport
+      };
+
+      await page.render(renderContext).promise;
+
+      document.getElementById('pdf-page-indicator').textContent = `Página ${currentPdfPage} de ${totalPdfPages}`;
+      document.getElementById('pdf-page-num-display').textContent = `${currentPdfPage} / ${totalPdfPages}`;
+    }
+
+    function prevPdfPage() {
+      if (currentPdfDoc && currentPdfPage > 1) {
+        currentPdfPage--;
+        renderCurrentPdfPage();
+      }
+    }
+
+    function nextPdfPage() {
+      if (currentPdfDoc && currentPdfPage < totalPdfPages) {
+        currentPdfPage++;
+        renderCurrentPdfPage();
+      }
+    }
+
+    function zoomPdf(delta) {
+      if (pdfScale + delta > 0.5 && pdfScale + delta < 3.0) {
+        pdfScale += delta;
+        renderCurrentPdfPage();
+      }
+    }
+
+    /* --- EPUB.JS READER --- */
+    async function renderEpubWork(work) {
+      const wrapper = document.getElementById('epub-viewer-wrapper');
+      wrapper.style.display = 'block';
+      document.getElementById('epub-header-controls').style.display = 'flex';
+
+      const area = document.getElementById('epub-viewer-area');
+      area.innerHTML = '';
+
+      if (!work.fileBlob) {
+        area.innerHTML = '<p style="padding:20px; color:red;">El archivo EPUB no está disponible.</p>';
+        return;
+      }
+
+      showToast("Cargando libro EPUB...");
+
+      try {
+        const arrayBuffer = await work.fileBlob.arrayBuffer();
+        currentEpubBook = ePub(arrayBuffer);
+        currentEpubRendition = currentEpubBook.renderTo("epub-viewer-area", {
+          width: "100%",
+          height: "100%",
+          flow: "paginated",
+          spread: "always"
+        });
+
+        // Apply skin theme to epub rendition
+        applyEpubTheme();
+
+        await currentEpubRendition.display();
+      } catch (err) {
+        console.error("Error loading EPUB:", err);
+        showToast("Error al inicializar el lector EPUB.");
+      }
+    }
+
+    function epubPrevPage() {
+      if (currentEpubRendition) currentEpubRendition.prev();
+    }
+
+    function epubNextPage() {
+      if (currentEpubRendition) currentEpubRendition.next();
+    }
+
+    function applyEpubTheme() {
+      if (!currentEpubRendition) return;
+      const isDark = document.body.classList.contains('skin-reversi');
+      const isSepia = document.body.classList.contains('skin-sepia');
+
+      let bg = '#ffffff', fg = '#2a2a2a';
+      if (isDark) { bg = '#1e1e1e'; fg = '#e0e0e0'; }
+      if (isSepia) { bg = '#f6ecdc'; fg = '#41352a'; }
+
+      currentEpubRendition.themes.default({
+        body: {
+          background: bg,
+          color: fg,
+          'font-family': 'Georgia, serif',
+          'line-height': '1.6 !important',
+          padding: '20px !important'
+        }
+      });
+    }
+
+    /* --------------------------------------------------------------------------
+       KUDOS SYSTEM & CONFETTI CELEBRATION
+       -------------------------------------------------------------------------- */
+    async function giveKudos() {
+      if (!currentWork || currentWork.hasKudoed) return;
+
+      currentWork.kudos = (currentWork.kudos || 0) + 1;
+      currentWork.hasKudoed = true;
+      await updateWorkInDB(currentWork);
+
+      document.getElementById('kudos-counter').textContent = currentWork.kudos;
+      const kudoBtn = document.getElementById('kudos-button');
+      kudoBtn.disabled = true;
+      kudoBtn.innerHTML = '<span>♥</span> ¡Kudos enviados! &lt;3';
+
+      const msg = document.getElementById('kudos-thankyou');
+      msg.classList.add('visible');
+
+      // Trigger Confetti effect
+      triggerConfetti();
+      showToast("¡Has dejado Kudos en esta obra!");
+    }
+
+    function triggerConfetti() {
+      const canvas = document.getElementById('confetti-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const particles = [];
+      const colors = ['#990000', '#ff3366', '#ffcc00', '#33cc66', '#3399ff', '#9933cc'];
+
+      for (let i = 0; i < 90; i++) {
+        particles.push({
+          x: canvas.width / 2,
+          y: canvas.height * 0.7,
+          vx: (Math.random() - 0.5) * 12,
+          vy: -(Math.random() * 12 + 6),
+          size: Math.random() * 8 + 4,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rotation: Math.random() * 360,
+          rotationSpeed: (Math.random() - 0.5) * 10,
+          gravity: 0.35,
+          opacity: 1
+        });
+      }
+
+      function update() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+
+        particles.forEach(p => {
+          p.x += p.vx;
+          p.y += p.vy;
+          p.vy += p.gravity;
+          p.rotation += p.rotationSpeed;
+          p.opacity -= 0.009;
+
+          if (p.opacity > 0) {
+            alive = true;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, p.opacity);
+            ctx.translate(p.x, p.y);
+            ctx.rotate((p.rotation * Math.PI) / 180);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+            ctx.restore();
+          }
+        });
+
+        if (alive) {
+          requestAnimationFrame(update);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+      update();
+    }
+
+    /* --------------------------------------------------------------------------
+       BOOKMARK & DELETE ACTIONS
+       -------------------------------------------------------------------------- */
+    async function toggleBookmark(workId, e) {
+      if (e) e.stopPropagation();
+      const work = allWorks.find(w => w.id === workId);
+      if (!work) return;
+
+      work.bookmarks = !work.bookmarks;
+      await updateWorkInDB(work);
+      showToast(work.bookmarks ? "Obra añadida a tus favoritos" : "Obra removida de favoritos");
+      applyFilters();
+    }
+
+    async function deleteWork(workId) {
+      const work = allWorks.find(w => w.id === workId);
+      const title = work ? work.title : 'esta obra';
+      if (!confirm(`¿Estás seguro de que deseas eliminar "${title}" de tu biblioteca local?`)) {
+        return;
+      }
+
+      await deleteWorkFromDB(workId);
+      showToast(`Obra eliminada del archivo.`);
+      await loadWorksList();
+    }
+
+    function exportWorkFile(workId) {
+      const work = allWorks.find(w => w.id === workId);
+      if (!work) return;
+
+      if (work.fileBlob) {
+        const url = URL.createObjectURL(work.fileBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = work.fileName || `${work.title}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        const blob = new Blob([work.textContent || ''], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${work.title}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+      showToast("Descargando archivo...");
+    }
+
+    function downloadCurrentWorkFile() {
+      if (currentWork) exportWorkFile(currentWork.id);
+    }
+
+    /* --------------------------------------------------------------------------
+       THEMES / SITE SKINS
+       -------------------------------------------------------------------------- */
+    function cycleTheme() {
+      currentThemeIndex = (currentThemeIndex + 1) % THEMES.length;
+      const theme = THEMES[currentThemeIndex];
+      document.body.classList.remove('skin-reversi', 'skin-sepia');
+
+      const label = document.getElementById('skin-label');
+      if (theme === 'reversi') {
+        document.body.classList.add('skin-reversi');
+        label.textContent = "Reversi (Oscuro)";
+      } else if (theme === 'sepia') {
+        document.body.classList.add('skin-sepia');
+        label.textContent = "Sepia Calm";
+      } else {
+        label.textContent = "AO3 Default";
+      }
+
+      applyEpubTheme();
+      showToast(`Skin cambiado a: ${label.textContent}`);
+    }
+
+    /* --------------------------------------------------------------------------
+       TYPOGRAPHY & READING PREFERENCES
+       -------------------------------------------------------------------------- */
+    let currentFontSize = 16;
+    function changeFontSize(delta) {
+      currentFontSize = Math.min(26, Math.max(12, currentFontSize + delta));
+      document.getElementById('text-content-area').style.fontSize = `${currentFontSize}px`;
+    }
+
+    function changeFontFamily(val) {
+      const area = document.getElementById('text-content-area');
+      if (val === 'sans') {
+        area.style.fontFamily = 'var(--ao3-font-sans)';
+      } else if (val === 'opendyslexic') {
+        area.style.fontFamily = '"Comic Sans MS", "Segoe UI", sans-serif';
+      } else {
+        area.style.fontFamily = 'var(--ao3-font-serif)';
+      }
+    }
+
+    let isWide = false;
+    function toggleReaderWidth() {
+      isWide = !isWide;
+      const container = document.getElementById('reader-main-container');
+      const btn = document.getElementById('reader-width-btn');
+      if (isWide) {
+        container.classList.add('reader-wide');
+        btn.textContent = "Ancho: Amplio";
+      } else {
+        container.classList.remove('reader-wide');
+        btn.textContent = "Ancho: Normal";
+      }
+    }
+
+    /* --------------------------------------------------------------------------
+       UTILITY HELPERS
+       -------------------------------------------------------------------------- */
+    function goHome() {
+      if (document.getElementById('reader-view').classList.contains('active')) {
+        exitReader();
+      }
+      currentFilterBookmarkOnly = false;
+      document.getElementById('nav-bookmarks').classList.remove('active');
+      document.getElementById('nav-works').classList.add('active');
+      applyFilters();
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast-notification');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 2800);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    /* --------------------------------------------------------------------------
+       APPLICATION BOOTSTRAP
+       -------------------------------------------------------------------------- */
+    window.addEventListener('DOMContentLoaded', async () => {
+      try {
+        await openDatabase();
+        await checkAndSeedDatabase();
+        await loadWorksList();
+      } catch (err) {
+        console.error("Initialization failed:", err);
+      }
+    });
+  </script>
+</body>
+</html>
